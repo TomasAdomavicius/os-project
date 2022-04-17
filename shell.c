@@ -16,6 +16,7 @@
 #define COMMAND_FG 2
 #define COMMAND_BG 3
 #define COMMAND_KILL 4
+#define COMMAND_EXIT 5
 
 #define STATUS_RUNNING 0
 #define STATUS_DONE 1
@@ -143,14 +144,21 @@ int getCommandType(char *command) {
         return COMMAND_BG;
     } else if (strcmp(command, "kill") == 0) {
         return COMMAND_KILL;
+    } else if (strcmp(command, "exit") == 0) {
+        return COMMAND_EXIT;
     } else {
         return COMMAND_EXTERNAL;
     }
 }
 
-// todo
 int executeBuiltinCommand(struct process *proc) {
-    return 0;
+    switch (proc->type) {
+        case COMMAND_EXIT:
+            exit(0);
+        default:
+            return 0;
+    }
+    return 1;
 }
 
 int launchProcess(struct job *job, struct process *proc, int mode) {
@@ -308,10 +316,6 @@ void loop() {
         if(strlen(line) == 0) {
             continue;
         }
-        // todo
-        if(strcmp(line, "exit") == 0) {
-            exit(0);
-        } 
         job = createJob(line);
         launchJob(job);
     }
