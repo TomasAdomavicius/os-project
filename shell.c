@@ -5,6 +5,7 @@
 #include <signal.h>
 #include <termios.h>
 
+#define NR_OF_JOBS 20
 #define BUFSIZE 1024
 
 #define BACKGROUND_EXECUTION 0
@@ -16,12 +17,25 @@
 #define COMMAND_BG 3
 #define COMMAND_KILL 4
 
+#define STATUS_RUNNING 0
+#define STATUS_DONE 1
+#define STATUS_SUSPENDED 2
+#define STATUS_TERMINATED 3
+
+const char* STATUS_STRING[] = {
+    "running",
+    "done",
+    "suspended",
+    "terminated"
+};
+
 struct process {
     char *command;
     int argc;
     char **argv;
     pid_t pid;
     int type;
+    int status;
 };
 
 struct job {
@@ -32,10 +46,93 @@ struct job {
     int mode;
 };
 
+struct shell_info {
+    struct job *jobs[NR_OF_JOBS + 1];
+};
+
+struct shell_info *shell;
+
 pid_t shell_pgid;
 struct termios shell_tmodes;
 int shell_terminal;
 int shell_is_interactive;
+
+int insertJob(struct job *job) {
+    int id = 1;
+    while(shell->jobs[id] == NULL) {
+        id++;
+    }
+
+    job->id = id;
+    shell->jobs[id] = job;
+    return id;
+}
+
+int releaseJob(int id) {
+    if (id > NR_OF_JOBS || shell->jobs[id] == NULL) {
+        return -1;
+    }
+
+    struct job *job = shell->jobs[id];
+    struct process *proc;
+    proc = job->root;
+    free(proc->command);
+    free(proc->argv);
+    free(proc);
+
+    free(job->command);
+    free(job);
+    return 0;
+}
+
+int removeJob(int id) {
+    if (id > NR_OF_JOBS || shell->jobs[id] == NULL) {
+        return -1;
+    }
+
+    releaseJob(id);
+    shell->jobs[id] = NULL;
+    return 0;
+}
+
+int setProcessStatus(int pid, int status) {
+    int i;
+    struct process *proc;
+
+    for (i = 1; i <= NR_OF_JOBS; i++) {
+        if (shell->jobs[i] == NULL) {
+            continue;
+        }
+        proc = shell->jobs[i]->root;
+        if (proc->pid == pid) {
+            proc->status = status;
+            return 0;
+        }
+    }
+    return -1;
+}
+
+int waitForJob(int id) {
+    if (id > NR_OF_JOBS || shell->jobs[id] == NULL) {
+        return -1;
+    }
+
+    int wait_pid = -1;
+    int status = 0;
+
+    wait_pid = waitpid(-shell->jobs[id]->pgid, &status, WUNTRACED);
+
+    if (WIFEXITED(status)) {
+        setProcessStatus(wait_pid, STATUS_DONE);
+    } else if (WIFSIGNALED(status)) {
+        setProcessStatus(wait_pid, STATUS_TERMINATED);
+    } else if (WSTOPSIG(status)) {
+        status = -1;
+        setProcessStatus(wait_pid, STATUS_SUSPENDED);
+        printf("[%d]\t%d\t%s\t%s\n", id, shell->jobs[id]->root->pid, STATUS_STRING[shell->jobs[id]->root->status], shell->jobs[id]->root->command);
+    }
+    return status;
+}
 
 int getCommandType(char *command) {
     if (strcmp(command, "jobs") == 0) {
@@ -49,6 +146,85 @@ int getCommandType(char *command) {
     } else {
         return COMMAND_EXTERNAL;
     }
+}
+
+// todo
+int executeBuiltinCommand(struct process *proc) {
+    return 0;
+}
+
+int launchProcess(struct job *job, struct process *proc, int mode) {
+    proc->status = STATUS_RUNNING;
+    if (proc->type != COMMAND_EXTERNAL && executeBuiltinCommand(proc)) {
+        return 0;
+    }
+
+    pid_t childpid;
+    int status = 0;
+
+    childpid = fork();
+
+    if (childpid < 0) {
+        return -1;
+    } else if (childpid == 0) {
+        signal(SIGINT, SIG_DFL);
+        signal(SIGQUIT, SIG_DFL);
+        signal(SIGTSTP, SIG_DFL);
+        signal(SIGTTIN, SIG_DFL);
+        signal(SIGTTOU, SIG_DFL);
+        signal(SIGCHLD, SIG_DFL);
+
+        proc->pid = getpid();
+        if (job->pgid > 0) {
+            setpgid(0, job->pgid);
+        } else {
+            job->pgid = proc->pid;
+            setpgid(0, job->pgid);
+        }
+
+        if (execvp(proc->argv[0], proc->argv) < 0) {
+            printf("command not found\n");
+            exit(0);
+        }
+
+        exit(0);
+    } else {
+        proc->pid = childpid;
+        if (job->pgid > 0) {
+            setpgid(childpid, job->pgid);
+        } else {
+            job->pgid = proc->pid;
+            setpgid(childpid, job->pgid);
+        }
+
+        if (mode == FOREGROUND_EXECUTION) {
+            tcsetpgrp(0, job->pgid);
+            status = waitForJob(job->id);
+            signal(SIGTTOU, SIG_IGN);
+            tcsetpgrp(0, getpid());
+            signal(SIGTTOU, SIG_DFL);
+        }
+    }
+    return status;
+}
+
+int launchJob(struct job *job) {
+    int status = 0, jobId = -1;
+
+    if (job->root->type == COMMAND_EXTERNAL) {
+        jobId = insertJob(job);
+    }
+
+    status = launchProcess(job, job->root, job->mode);
+
+    if (job->root->type == COMMAND_EXTERNAL) {
+        if (status >= 0 && job->mode == FOREGROUND_EXECUTION) {
+            removeJob(jobId);
+        } else if (job->mode == BACKGROUND_EXECUTION) {
+            printf("[%d] %d\n", jobId, job->root->pid);
+        }
+    }
+    return status;
 }
 
 struct process* createProcess(char *line) {
@@ -137,6 +313,7 @@ void loop() {
             exit(0);
         } 
         job = createJob(line);
+        launchJob(job);
     }
 }
 
@@ -173,6 +350,11 @@ void init() {
 
       /* Save default terminal attributes for shell.  */
       tcgetattr (shell_terminal, &shell_tmodes);
+    }
+
+    shell = (struct shell_info*) malloc(sizeof(struct shell_info));
+    for (int i = 0; i < NR_OF_JOBS; i++) {
+        shell->jobs[i] = NULL;
     }
 }
 
