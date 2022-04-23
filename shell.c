@@ -151,10 +151,22 @@ int getCommandType(char *command) {
     }
 }
 
+int jobs(int argc, char **argv) {
+    for(int i = 0; i < NR_OF_JOBS; i++) {
+        if (shell->jobs[i] != NULL) {
+            printf("[%d] %d\n", i, shell->jobs[i]->root->pid);
+        }
+    }
+    return 0;
+}
+
 int executeBuiltinCommand(struct process *proc) {
     switch (proc->type) {
         case COMMAND_EXIT:
             exit(0);
+        case COMMAND_JOBS:
+            jobs(proc->argc, proc->argv);
+            break;
         default:
             return 0;
     }
