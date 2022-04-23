@@ -60,7 +60,7 @@ int shell_is_interactive;
 
 int insertJob(struct job *job) {
     int id = 1;
-    while(shell->jobs[id] == NULL) {
+    while(shell->jobs[id] != NULL) {
         id++;
     }
 
