@@ -4,6 +4,7 @@
 #include <string.h>
 #include <signal.h>
 #include <termios.h>
+#include <stdbool.h>
 
 #define NR_OF_JOBS 20
 #define BUFSIZE 1024
@@ -57,6 +58,8 @@ pid_t shell_pgid;
 struct termios shell_tmodes;
 int shell_terminal;
 int shell_is_interactive;
+
+pid_t waitpid(pid_t pid, int *stat_loc, int options);
 
 int insertJob(struct job *job) {
     int id = 1;
@@ -306,16 +309,94 @@ char* readLine() {
     }
 }
 
+// Display result of the assignment
+struct pre_assessment {
+    bool valid;
+    char *assignment;
+};
+
+void display_assignment_result(struct pre_assessment pa, char *line) {
+    // Retrieve the first 8 characters forming the "echo -e "
+    const int COMM_SIZE = 8;
+    char command[COMM_SIZE + 1];
+    for (int i = 0; i < COMM_SIZE; i++) command[i] = line[i];
+    command[COMM_SIZE] = '\0';
+
+    // Retrieve the string inside the quotation marks
+    char display_str[strlen(line)];
+    for (int i = (COMM_SIZE + 1); i < (strlen(line)-1); i++) display_str[i-(COMM_SIZE + 1)] = line[i];
+
+    // Retrieve index of '=' sign
+    int start_index = 0;
+    for (int i = 0; i < strlen(pa.assignment); i++) {
+        if (pa.assignment[i] == '=') {
+            start_index = i;
+            break;
+        }
+    }
+
+    // Extract value after '=' sign
+    char value_str[strlen(pa.assignment)];
+    for (int i = start_index+1; i < strlen(pa.assignment); i++) {
+        value_str[i-(start_index+1)] = pa.assignment[i];
+    }
+
+    // 
+
+    if (!strcmp(command, "echo -e ")) printf("%s%s\n", display_str, value_str);
+    // return false;
+}
+
+// Shell substitution
+struct pre_assessment verify_assignment_syntax(char *line) {
+    /* Validate:
+        - Variable is followed by "="
+        - Only 1 "=" in the assignment
+    */
+
+    int index = 0;
+    int equal_sign_count = 0;
+    struct pre_assessment a;
+
+    while (index < strlen(line)) {
+        if (line[index] == '=') equal_sign_count += 1;
+        index += 1;
+    }
+
+    a.assignment = "";
+    a.valid = false;
+    if (equal_sign_count == 1) {
+        a.assignment = line;
+        a.valid = true;
+    }
+    return a;
+    // printf("command not found\n");
+    // exit(0);
+}
+
 void loop() {
     char *line;
     struct job *job;
 
-    while(1) {
+    struct pre_assessment assessment;
+    assessment.assignment = "";
+    assessment.valid = false;
+
+    while (1) {
         printf("> ");
         line = readLine();
-        if(strlen(line) == 0) {
+
+        if (strlen(line) == 0) continue;
+
+        // Validate the assignment input
+        if (strlen(assessment.assignment) == 0) {
+            assessment = verify_assignment_syntax(line);
             continue;
         }
+        // Confirm that the assessment is valid
+        if (assessment.valid == true) 
+            display_assignment_result(assessment, line);
+
         job = createJob(line);
         launchJob(job);
     }
