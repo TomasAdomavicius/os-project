@@ -115,6 +115,10 @@ int setProcessStatus(int pid, int status) {
     return -1;
 }
 
+void printJobStatus(int id) {
+    printf("[%d]\t%d\t%s\t%s\n", id, shell->jobs[id]->root->pid, STATUS_STRING[shell->jobs[id]->root->status], shell->jobs[id]->root->command);
+}
+
 int waitForJob(int id) {
     if (id > NR_OF_JOBS || shell->jobs[id] == NULL) {
         return -1;
@@ -132,7 +136,7 @@ int waitForJob(int id) {
     } else if (WSTOPSIG(status)) {
         status = -1;
         setProcessStatus(wait_pid, STATUS_SUSPENDED);
-        printf("[%d]\t%d\t%s\t%s\n", id, shell->jobs[id]->root->pid, STATUS_STRING[shell->jobs[id]->root->status], shell->jobs[id]->root->command);
+        printJobStatus(id);
     }
     return status;
 }
@@ -156,7 +160,7 @@ int getCommandType(char *command) {
 int jobs(int argc, char **argv) {
     for(int i = 0; i < NR_OF_JOBS; i++) {
         if (shell->jobs[i] != NULL) {
-            printf("[%d] %d\n", i, shell->jobs[i]->root->pid);
+            printJobStatus(i);
         }
     }
     return 0;
@@ -194,7 +198,7 @@ int fg(int argc, char **argv) {
         if (shell->jobs[id]->root->status != STATUS_DONE) {
             shell->jobs[id]->root->status = STATUS_CONTINUED;
         }
-        printf("[%d]\t%d\t%s\t%s\n", id, shell->jobs[id]->root->pid, STATUS_STRING[shell->jobs[id]->root->status], shell->jobs[id]->root->command);
+        printJobStatus(id);
         if (waitForJob(id) >= 0) {
             removeJob(id);
         }
@@ -246,7 +250,7 @@ int bg(int argc, char **argv) {
         if (shell->jobs[id]->root->status != STATUS_DONE) {
             shell->jobs[id]->root->status = STATUS_CONTINUED;
         }
-        printf("[%d]\t%d\t%s\t%s\n", id, shell->jobs[id]->root->pid, STATUS_STRING[shell->jobs[id]->root->status], shell->jobs[id]->root->command);
+        printJobStatus(id);
     }
 
     return 0;
@@ -277,7 +281,7 @@ int killJob(int argc, char **argv) {
         if (shell->jobs[id]->root->status != STATUS_DONE) {
             shell->jobs[id]->root->status = STATUS_TERMINATED;
         }
-        printf("[%d]\t%d\t%s\t%s\n", id, shell->jobs[id]->root->pid, STATUS_STRING[shell->jobs[id]->root->status], shell->jobs[id]->root->command);
+        printJobStatus(id);
         if (waitForJob(id) >= 0) {
             removeJob(id);
         }
