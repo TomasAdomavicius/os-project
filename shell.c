@@ -312,6 +312,40 @@ int executeBuiltinCommand(struct process *proc) {
     return 1;
 }
 
+int getJobIdByPid(int pid) {
+    struct process *proc;
+
+    for (int i = 1; i <= NR_OF_JOBS; i++) {
+        if (shell->jobs[i] != NULL) {
+            proc = shell->jobs[i]->root;
+            if (proc->pid == pid) {
+                return i;
+            }
+        }
+    }
+
+    return -1;
+}
+
+void checkZombie() {
+    int status, pid;
+    while ((pid = waitpid(-1, &status, WNOHANG|WUNTRACED|WCONTINUED)) > 0) {
+        if (WIFEXITED(status)) {
+            setProcessStatus(pid, STATUS_DONE);
+        } else if (WIFSTOPPED(status)) {
+            setProcessStatus(pid, STATUS_SUSPENDED);
+        } else if (WIFCONTINUED(status)) {
+            setProcessStatus(pid, STATUS_CONTINUED);
+        }
+
+        int job_id = getJobIdByPid(pid);
+        if (job_id > 0 && shell->jobs[job_id]->root->status == STATUS_DONE) {
+            printJobStatus(job_id);
+            removeJob(job_id);
+        }
+    }
+}
+
 int launchProcess(struct job *job, struct process *proc, int mode) {
     proc->status = STATUS_RUNNING;
     if (proc->type != COMMAND_EXTERNAL && executeBuiltinCommand(proc)) {
@@ -370,6 +404,7 @@ int launchProcess(struct job *job, struct process *proc, int mode) {
 int launchJob(struct job *job) {
     int status = 0, jobId = -1;
 
+    checkZombie();
     if (job->root->type == COMMAND_EXTERNAL) {
         jobId = insertJob(job);
     }
@@ -466,6 +501,7 @@ void loop() {
         printf("> ");
         line = readLine();
         if(strlen(line) == 0) {
+            checkZombie();
             continue;
         }
         job = createJob(line);
@@ -491,7 +527,6 @@ void init() {
       signal (SIGTSTP, SIG_IGN);
       signal (SIGTTIN, SIG_IGN);
       signal (SIGTTOU, SIG_IGN);
-      signal (SIGCHLD, SIG_IGN);
 
       /* Put ourselves in our own process group.  */
       shell_pgid = getpid ();
