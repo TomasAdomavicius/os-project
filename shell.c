@@ -410,6 +410,7 @@ struct process* createProcess(char *line) {
 
 struct job* createJob(char *line) {
     int mode = FOREGROUND_EXECUTION;
+    char *command = strdup(line);
 
     if (line[strlen(line) - 1] == '&') {
         mode = BACKGROUND_EXECUTION;
@@ -418,7 +419,7 @@ struct job* createJob(char *line) {
 
     struct job *job = (struct job*) malloc(sizeof(struct job));
     job->root = createProcess(line);
-    job->command = line;
+    job->command = command;
     job->pgid = -1;
     job->mode = mode;
     return job;
