@@ -24,12 +24,14 @@
 #define STATUS_DONE 1
 #define STATUS_SUSPENDED 2
 #define STATUS_TERMINATED 3
+#define STATUS_CONTINUED 4
 
 const char* STATUS_STRING[] = {
     "running",
     "done",
     "suspended",
-    "terminated"
+    "terminated",
+    "continued"
 };
 
 struct process {
@@ -64,7 +66,7 @@ pid_t waitpid(pid_t pid, int *stat_loc, int options);
 
 int insertJob(struct job *job) {
     int id = 1;
-    while(shell->jobs[id] == NULL) {
+    while(shell->jobs[id] != NULL) {
         id++;
     }
 
@@ -117,6 +119,10 @@ int setProcessStatus(int pid, int status) {
     return -1;
 }
 
+void printJobStatus(int id) {
+    printf("[%d]\t%d\t%s\t%s\n", id, shell->jobs[id]->root->pid, STATUS_STRING[shell->jobs[id]->root->status], shell->jobs[id]->root->command);
+}
+
 int waitForJob(int id) {
     if (id > NR_OF_JOBS || shell->jobs[id] == NULL) {
         return -1;
@@ -134,7 +140,7 @@ int waitForJob(int id) {
     } else if (WSTOPSIG(status)) {
         status = -1;
         setProcessStatus(wait_pid, STATUS_SUSPENDED);
-        printf("[%d]\t%d\t%s\t%s\n", id, shell->jobs[id]->root->pid, STATUS_STRING[shell->jobs[id]->root->status], shell->jobs[id]->root->command);
+        printJobStatus(id);
     }
     return status;
 }
@@ -155,14 +161,193 @@ int getCommandType(char *command) {
     }
 }
 
+int jobs(int argc, char **argv) {
+    for(int i = 0; i < NR_OF_JOBS; i++) {
+        if (shell->jobs[i] != NULL) {
+            printJobStatus(i);
+        }
+    }
+    return 0;
+}
+
+int fg(int argc, char **argv) {
+    if (argc != 2) {
+        printf("usage: fg <pid>\n");
+        return -1;
+    }
+
+    int status;
+    pid_t pid;
+    int id = -1;
+
+    if (argv[1][0] == '%') {
+        id = atoi(argv[1] + 1);
+        pid = shell->jobs[id]->pgid;
+        if (pid < 0) {
+            printf("fg %s: no such job\n", argv[1]);
+            return -1;
+        }
+    } else {
+        pid = atoi(argv[1]);
+    }
+
+    if (kill(-pid, SIGCONT) < 0) {
+        printf("fg %d: job not found\n", pid);
+        return -1;
+    }
+
+    tcsetpgrp(0, pid);
+
+    if (id > 0) {
+        if (shell->jobs[id]->root->status != STATUS_DONE) {
+            shell->jobs[id]->root->status = STATUS_CONTINUED;
+        }
+        printJobStatus(id);
+        if (waitForJob(id) >= 0) {
+            removeJob(id);
+        }
+    } else {
+        int s = 0;
+        waitpid(pid, &s, WUNTRACED);
+        if (WIFEXITED(s)) {
+            setProcessStatus(pid, STATUS_DONE);
+        } else if (WIFSIGNALED(s)) {
+            setProcessStatus(pid, STATUS_TERMINATED);
+        } else if (WSTOPSIG(s)) {
+            setProcessStatus(pid, STATUS_SUSPENDED);
+        }
+    }
+
+    signal(SIGTTOU, SIG_IGN);
+    tcsetpgrp(0, getpid());
+    signal(SIGTTOU, SIG_DFL);
+
+    return 0;
+}
+
+int bg(int argc, char **argv) {
+    if (argc != 2) {
+        printf("usage: bg <pid>\n");
+        return -1;
+    }
+
+    pid_t pid;
+    int id = -1;
+
+    if (argv[1][0] == '%') {
+        id = atoi(argv[1] + 1);
+        pid = shell->jobs[id]->pgid;
+        if (pid < 0) {
+            printf("bg %s: no such job\n", argv[1]);
+            return -1;
+        }
+    } else {
+        pid = atoi(argv[1]);
+    }
+
+    if (kill(-pid, SIGCONT) < 0) {
+        printf("bg %d: job not found\n", pid);
+        return -1;
+    }
+
+    if (id > 0) {
+        if (shell->jobs[id]->root->status != STATUS_DONE) {
+            shell->jobs[id]->root->status = STATUS_CONTINUED;
+        }
+        printJobStatus(id);
+    }
+
+    return 0;
+}
+
+int killJob(int argc, char **argv) {
+    pid_t pid;
+    int id = -1;
+
+    if (argv[1][0] == '%') {
+        id = atoi(argv[1] + 1);
+        pid = shell->jobs[id]->pgid;
+        if (pid < 0) {
+            printf("kill %s: no such job\n", argv[1]);
+            return -1;
+        }
+        pid = -pid;
+    } else {
+        pid = atoi(argv[1]);
+    }
+
+    if (kill(pid, SIGKILL) < 0) {
+        printf("kill %d: job not found\n", pid);
+        return 0;
+    }
+
+    if (id > 0) {
+        if (shell->jobs[id]->root->status != STATUS_DONE) {
+            shell->jobs[id]->root->status = STATUS_TERMINATED;
+        }
+        printJobStatus(id);
+        if (waitForJob(id) >= 0) {
+            removeJob(id);
+        }
+    }
+
+    return 1;
+}
+
 int executeBuiltinCommand(struct process *proc) {
     switch (proc->type) {
         case COMMAND_EXIT:
             exit(0);
+        case COMMAND_JOBS:
+            jobs(proc->argc, proc->argv);
+            break;
+        case COMMAND_FG:
+            fg(proc->argc, proc->argv);
+            break;
+        case COMMAND_BG:
+            bg(proc->argc, proc->argv);
+            break;
+        case COMMAND_KILL:
+            killJob(proc->argc, proc->argv);
+            break;
         default:
             return 0;
     }
     return 1;
+}
+
+int getJobIdByPid(int pid) {
+    struct process *proc;
+
+    for (int i = 1; i <= NR_OF_JOBS; i++) {
+        if (shell->jobs[i] != NULL) {
+            proc = shell->jobs[i]->root;
+            if (proc->pid == pid) {
+                return i;
+            }
+        }
+    }
+
+    return -1;
+}
+
+void checkZombie() {
+    int status, pid;
+    while ((pid = waitpid(-1, &status, WNOHANG|WUNTRACED|WCONTINUED)) > 0) {
+        if (WIFEXITED(status)) {
+            setProcessStatus(pid, STATUS_DONE);
+        } else if (WIFSTOPPED(status)) {
+            setProcessStatus(pid, STATUS_SUSPENDED);
+        } else if (WIFCONTINUED(status)) {
+            setProcessStatus(pid, STATUS_CONTINUED);
+        }
+
+        int job_id = getJobIdByPid(pid);
+        if (job_id > 0 && shell->jobs[job_id]->root->status == STATUS_DONE) {
+            printJobStatus(job_id);
+            removeJob(job_id);
+        }
+    }
 }
 
 int launchProcess(struct job *job, struct process *proc, int mode) {
@@ -223,6 +408,7 @@ int launchProcess(struct job *job, struct process *proc, int mode) {
 int launchJob(struct job *job) {
     int status = 0, jobId = -1;
 
+    checkZombie();
     if (job->root->type == COMMAND_EXTERNAL) {
         jobId = insertJob(job);
     }
@@ -263,6 +449,7 @@ struct process* createProcess(char *line) {
 
 struct job* createJob(char *line) {
     int mode = FOREGROUND_EXECUTION;
+    char *command = strdup(line);
 
     if (line[strlen(line) - 1] == '&') {
         mode = BACKGROUND_EXECUTION;
@@ -271,7 +458,7 @@ struct job* createJob(char *line) {
 
     struct job *job = (struct job*) malloc(sizeof(struct job));
     job->root = createProcess(line);
-    job->command = line;
+    job->command = command;
     job->pgid = -1;
     job->mode = mode;
     return job;
@@ -376,13 +563,14 @@ void loop() {
         printf("> ");
         line = readLine();
 
-        if (strlen(line) == 0) continue;
-
-        // Validate the assignment input
-        if (strlen(assessment.assignment) == 0) {
-            assessment = verify_assignment_syntax(line);
+        if(strlen(line) == 0) {
+            checkZombie();
             continue;
         }
+
+        // Validate the assignment input
+        if (strlen(assessment.assignment) == 0) assessment = verify_assignment_syntax(line);
+        
         // Confirm that the assessment is valid
         if (assessment.valid == true) {
             display_assignment_result(assessment, line);
@@ -412,7 +600,6 @@ void init() {
       signal (SIGTSTP, SIG_IGN);
       signal (SIGTTIN, SIG_IGN);
       signal (SIGTTOU, SIG_IGN);
-      signal (SIGCHLD, SIG_IGN);
 
       /* Put ourselves in our own process group.  */
       shell_pgid = getpid ();
