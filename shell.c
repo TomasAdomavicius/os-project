@@ -5,6 +5,7 @@
 #include <signal.h>
 #include <termios.h>
 #include <stdbool.h>
+#include "shell_substitution.h"
 
 #define NR_OF_JOBS 20
 #define BUFSIZE 1024
@@ -316,35 +317,24 @@ struct pre_assessment {
 };
 
 void display_assignment_result(struct pre_assessment pa, char *line) {
-    // Retrieve the first 8 characters forming the "echo -e "
-    const int COMM_SIZE = 8;
-    char command[COMM_SIZE + 1];
-    for (int i = 0; i < COMM_SIZE; i++) command[i] = line[i];
-    command[COMM_SIZE] = '\0';
-
-    // Retrieve the string inside the quotation marks
-    char display_str[strlen(line)];
-    for (int i = (COMM_SIZE + 1); i < (strlen(line)-1); i++) display_str[i-(COMM_SIZE + 1)] = line[i];
-
-    // Retrieve index of '=' sign
-    int start_index = 0;
-    for (int i = 0; i < strlen(pa.assignment); i++) {
-        if (pa.assignment[i] == '=') {
-            start_index = i;
-            break;
-        }
+    bool res = is_print_command_valid(line);
+    if (!res) {
+        printf("%s\n", "Command is invalid!");
+        return;
     }
 
-    // Extract value after '=' sign
-    char value_str[strlen(pa.assignment)];
-    for (int i = start_index+1; i < strlen(pa.assignment); i++) {
-        value_str[i-(start_index+1)] = pa.assignment[i];
-    }
+    int start_index = get_index_of_char_in_string(pa.assignment);
+    char *variable_str = extract_substring_before_equal_sign(pa.assignment);
+    char *value_str = extract_value_after_equal_sign(pa.assignment, start_index);
 
-    // 
+    char *display_str = retrieve_string_inside_quotation_mark(line);
+    int pre_suf_index = get_index_of_character(display_str);
 
-    if (!strcmp(command, "echo -e ")) printf("%s%s\n", display_str, value_str);
-    // return false;
+    // Extract prefix
+    char *prefix = extract_prefix_from_string(display_str, pre_suf_index);
+    char *suffix = extract_suffix_from_string(display_str, variable_str, pre_suf_index);
+    
+    printf("%s%s%s\n", prefix, value_str, suffix);
 }
 
 // Shell substitution
@@ -394,8 +384,10 @@ void loop() {
             continue;
         }
         // Confirm that the assessment is valid
-        if (assessment.valid == true) 
+        if (assessment.valid == true) {
             display_assignment_result(assessment, line);
+            assessment.valid = false;
+        }
 
         job = createJob(line);
         launchJob(job);
