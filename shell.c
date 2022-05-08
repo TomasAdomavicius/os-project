@@ -497,67 +497,62 @@ char* readLine() {
     }
 }
 
-// Display result of the assignment
-struct pre_assessment {
-    bool valid;
-    char *assignment;
-};
-
-void display_assignment_result(struct pre_assessment pa, char *line) {
+// Display the result after processing and extraction
+void display_assignment_result(struct evaluation_factors e, char *line) {
     bool res = is_print_command_valid(line);
     if (!res) {
         printf("%s\n", "Command is invalid!");
         return;
     }
 
-    int start_index = get_index_of_char_in_string(pa.assignment);
-    char *variable_str = extract_substring_before_equal_sign(pa.assignment);
-    char *value_str = extract_value_after_equal_sign(pa.assignment, start_index);
+    int start_index = get_index_of_char_in_string(e.assignment);
+    char *variable_str = extract_substring_before_equal_sign(e.assignment);
+    char *value_str = extract_value_after_equal_sign(e.assignment, start_index);
 
     char *display_str = retrieve_string_inside_quotation_mark(line);
-    int pre_suf_index = get_index_of_character(display_str);
+    // If '$' is not present (no assignment evaluation displayed)
+    if (is_dollar_present(display_str)) {
+        int pre_suf_index = get_index_of_character(display_str);
 
-    // Extract prefix
-    char *prefix = extract_prefix_from_string(display_str, pre_suf_index);
-    char *suffix = extract_suffix_from_string(display_str, variable_str, pre_suf_index);
-    
-    printf("%s%s%s\n", prefix, value_str, suffix);
+        // Extract prefix (anything before $)
+        char *prefix = extract_prefix_from_string(display_str, pre_suf_index);
+        // Extract suffix (anything after the assignment of $)
+        char *suffix = extract_suffix_from_string(display_str, variable_str, pre_suf_index);
+
+        printf("%s%s%s\n", prefix, value_str, suffix);
+    } else {    // Display string as usual
+        printf("%s\n", display_str);
+    }
 }
 
-// Shell substitution
-struct pre_assessment verify_assignment_syntax(char *line) {
+// Evaluate if the assignment is syntax-correct
+struct evaluation_factors verify_assignment_syntax(struct evaluation_factors e, char *line) {
     /* Validate:
         - Variable is followed by "="
         - Only 1 "=" in the assignment
     */
-
     int index = 0;
     int equal_sign_count = 0;
-    struct pre_assessment a;
-
     while (index < strlen(line)) {
         if (line[index] == '=') equal_sign_count += 1;
         index += 1;
     }
 
-    a.assignment = "";
-    a.valid = false;
     if (equal_sign_count == 1) {
-        a.assignment = line;
-        a.valid = true;
+        e.assignment = line;
+        e.valid = true;
     }
-    return a;
-    // printf("command not found\n");
-    // exit(0);
+    return e;
 }
 
 void loop() {
     char *line;
     struct job *job;
 
-    struct pre_assessment assessment;
-    assessment.assignment = "";
-    assessment.valid = false;
+    // Initialize values for assignment evaluation preventing error prompt
+    struct evaluation_factors eval;
+    eval.assignment = "";
+    eval.valid = false;
 
     while (1) {
         printf("> ");
@@ -569,12 +564,17 @@ void loop() {
         }
 
         // Validate the assignment input
-        if (strlen(assessment.assignment) == 0) assessment = verify_assignment_syntax(line);
+        if (strlen(eval.assignment) == 0) {
+            eval = verify_assignment_syntax(eval, line);
+            continue;
+        }
         
         // Confirm that the assessment is valid
-        if (assessment.valid == true) {
-            display_assignment_result(assessment, line);
-            assessment.valid = false;
+        if (eval.valid == true) {
+            display_assignment_result(eval, line);
+            // eval.assignment = "";
+            eval.valid = false;
+            continue;
         }
 
         job = createJob(line);

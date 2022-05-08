@@ -2,17 +2,20 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define COMM_SIZE 8
+#define COMM_SIZE 6
+
+// Display result of the assignment
+struct evaluation_factors {
+    bool valid;
+    char *assignment;
+};
 
 bool is_print_command_valid(char *line)
 {
-    // Retrieve the first 8 characters forming the "echo -e "
     // NOTE: Need to handle single quote as invalid
-    char command[COMM_SIZE + 1];
-    for (int i = 0; i < COMM_SIZE; i++) command[i] = line[i];
-    command[COMM_SIZE] = '\0';
+    char *command = strndup(line, COMM_SIZE);
 
-    if (!strcmp(command, "echo -e ")) return true;
+    if (!strcmp(command, "print ")) return true;
     return false;
 }
 
@@ -23,6 +26,13 @@ char *retrieve_string_inside_quotation_mark(char *line)
     for (int i = (COMM_SIZE + 1); i < (strlen(line)-1); i++) 
         display_str[i-(COMM_SIZE + 1)] = line[i];
     return display_str;
+}
+
+bool is_dollar_present(char *str)
+{
+    for (int i = 0; i < strlen(str); i++)
+        if (str[i] == '$') return true;
+    return false;
 }
 
 int get_index_of_char_in_string(char *assignment)
