@@ -22,71 +22,41 @@ bool is_print_command_valid(char *line)
 char *retrieve_string_inside_quotation_mark(char *line)
 {
     // Retrieve the string inside the quotation marks
+    // char *quotation_mark_str = strchr(line, '"');
     char *display_str = (char *)malloc (sizeof (char) * strlen(line));
     for (int i = (COMM_SIZE + 1); i < (strlen(line)-1); i++) 
         display_str[i-(COMM_SIZE + 1)] = line[i];
     return display_str;
 }
 
-bool is_dollar_present(char *str)
+char *is_dollar_present(char *str)
 {
-    for (int i = 0; i < strlen(str); i++)
-        if (str[i] == '$') return true;
-    return false;
+    return strchr(str, '$');
 }
 
-int get_index_of_char_in_string(char *assignment)
+char *extract_substring_of_equal_sign_string(char *assignment, char cond)
 {
-    // Retrieve index of '=' sign
-    int index = 0;
-    for (int i = 0; i < strlen(assignment); i++) {
-        if (assignment[i] == '=') return i;
-    }
-    return index;
-}
-
-char *extract_substring_before_equal_sign(char *assignment)
-{
+    int index = strcspn(assignment, "=");
     char *tmp_str = (char *)malloc (sizeof (char) * strlen(assignment));
-    for (int i = 0; i < strlen(assignment); i++) {
-        if (assignment[i] == '=') break;
-        tmp_str[i] = assignment[i];
-    }
+
+    if (cond == 'p')
+        for (int i = 0; i < index; i++) strncat(tmp_str, &assignment[i], 1);
+    else
+        for (int i = index+1; i < strlen(assignment); i++) strncat(tmp_str, &assignment[i], 1);
+    
     return tmp_str;
 }
 
-char *extract_value_after_equal_sign(char *assignment, int start_idx)
+char *extract_substring_of_dollar_string(char *str, char *var_str, char cond)
 {
-    // Extract value after '=' sign
-    char *value_str = (char *)malloc (sizeof (char) * strlen(assignment));
-    for (int i = start_idx+1; i < strlen(assignment); i++) {
-        value_str[i-(start_idx+1)] = assignment[i];
-    }
-    return value_str;
-}
+    int index = strcspn(str, "$");
+    char *substring = (char *)malloc (sizeof (char) * strlen(str));
 
-int get_index_of_character(char *str)
-{
-    int index = 0;
-    for (int i = 0; i < strlen(str); i++) {
-        if (str[i] == '$') index = i;
+    if (cond == 'p') {
+        for (int i = 0; i < index; i++) strncat(substring, &str[i], 1);
+    } else {
+        for (int i = index+1+strlen(var_str); i < strlen(str); i++) strncat(substring, &str[i], 1);
     }
-    return index;
-}
 
-char *extract_prefix_from_string(char *str, int index)
-{
-    char *prefix = (char *)malloc (sizeof (char) * strlen(str));
-    for (int i = 0; i < index; i++) strncat(prefix, &str[i], 1);
-    return prefix;
-}
-
-char *extract_suffix_from_string(char *str, char *var, int index)
-{
-    char *suffix = (char *)malloc (sizeof (char) * strlen(str));
-    for (int i = index+1+strlen(var); i < strlen(str); i++) {
-        strncat(suffix, &str[i], 1);
-    }
-    suffix[strlen(str)] = '\0';
-    return suffix;
+    return substring;
 }

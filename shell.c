@@ -505,24 +505,19 @@ void display_assignment_result(struct evaluation_factors e, char *line) {
         return;
     }
 
-    int start_index = get_index_of_char_in_string(e.assignment);
-    char *variable_str = extract_substring_before_equal_sign(e.assignment);
-    char *value_str = extract_value_after_equal_sign(e.assignment, start_index);
+    char *variable_str = extract_substring_of_equal_sign_string(e.assignment, 'p');
+    char *value_str = extract_substring_of_equal_sign_string(e.assignment, 's');
 
     char *display_str = retrieve_string_inside_quotation_mark(line);
-    // If '$' is not present (no assignment evaluation displayed)
     if (is_dollar_present(display_str)) {
-        int pre_suf_index = get_index_of_character(display_str);
-
         // Extract prefix (anything before $)
-        char *prefix = extract_prefix_from_string(display_str, pre_suf_index);
+        char *prefix = extract_substring_of_dollar_string(display_str, "", 'p');
         // Extract suffix (anything after the assignment of $)
-        char *suffix = extract_suffix_from_string(display_str, variable_str, pre_suf_index);
+        char *suffix = extract_substring_of_dollar_string(display_str, variable_str, 's');
 
         printf("%s%s%s\n", prefix, value_str, suffix);
-    } else {    // Display string as usual
+    } else   // Display string as usual
         printf("%s\n", display_str);
-    }
 }
 
 // Evaluate if the assignment is syntax-correct
@@ -550,9 +545,9 @@ void loop() {
     struct job *job;
 
     // Initialize values for assignment evaluation preventing error prompt
-    struct evaluation_factors eval;
-    eval.assignment = "";
-    eval.valid = false;
+    // struct evaluation_factors eval;
+    // eval.assignment = "";
+    // eval.valid = false;
 
     while (1) {
         printf("> ");
@@ -563,19 +558,19 @@ void loop() {
             continue;
         }
 
-        // Validate the assignment input
-        if (strlen(eval.assignment) == 0) {
-            eval = verify_assignment_syntax(eval, line);
-            continue;
-        }
+        // // Validate the assignment input
+        // if (strlen(eval.assignment) == 0) {
+        //     eval = verify_assignment_syntax(eval, line);
+        //     continue;
+        // }
         
-        // Confirm that the assessment is valid
-        if (eval.valid == true) {
-            display_assignment_result(eval, line);
-            // eval.assignment = "";
-            eval.valid = false;
-            continue;
-        }
+        // // Confirm that the assessment is valid
+        // if (eval.valid == true) {
+        //     display_assignment_result(eval, line);
+        //     // eval.assignment = "";
+        //     eval.valid = false;
+        //     continue;
+        // }
 
         job = createJob(line);
         launchJob(job);
