@@ -1,3 +1,5 @@
 *
 
 !.gitignore
+!shell.c
+!shell_substitution.h
