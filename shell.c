@@ -6,7 +6,9 @@
 #include <termios.h>
 #include <stdbool.h>
 #include "direct_assignment.h"
+#include "operator_evaluation.h"
 #include "expression_validation.h"
+
 
 #define NR_OF_JOBS 20
 #define BUFSIZE 1024
@@ -518,29 +520,6 @@ void display_assignment_result(struct evaluation_factors e, char *line) {
         printf("%s\n", display_str);
 }
 
-// Evaluate if the assignment is syntax-correct
-struct evaluation_factors verify_assignment_syntax(struct evaluation_factors e, char *line) {
-    /* Validate:
-        - Variable is followed by "="
-        - Only 1 "=" in the assignment
-    */
-    int index = 0;
-    int equal_sign_count = 0;
-    while (index < strlen(line)) {
-        if (line[index] == '=') equal_sign_count += 1;
-        index += 1;
-    }
-
-    if (equal_sign_count == 1) {
-        e = extract_assign(e, line);
-        e = classify(e);
-        
-        // printf("%d\n", e.evaluating_value);
-        // printf("%d\n", e.valid);
-    }
-    return e;
-}
-
 struct evaluation_factors initialize_expression() 
 {
     struct evaluation_factors eval;
@@ -576,13 +555,12 @@ void loop() {
             if (eval.valid == true && eval.evaluating_value == true) eval = extract_evaluate(eval);
             continue;
         }
-        
         // Assign value to output for displaying
         if (eval.valid == true) {
             display_assignment_result(eval, line);
             eval.valid = false;
+            continue;
         } else printf("result not printed due to invalid expression\n");
-        // continue;
 
         job = createJob(line);
         launchJob(job);

@@ -1,65 +1,7 @@
-#define _OPEN_SYS_ITOA_EXT
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-
-const char* MATH_OPS = "*/+-";
-
-double calculate(char *val_one, char *val_two, char *math_op)
-{
-    double tmp_total = 0;
-    if (*math_op == MATH_OPS[0]) tmp_total = atoi(val_one) * atoi(val_two);
-    if (*math_op == MATH_OPS[1]) tmp_total = atoi(val_one) / atoi(val_two);
-    if (*math_op == MATH_OPS[2]) tmp_total = atoi(val_one) + atoi(val_two);
-    if (*math_op == MATH_OPS[3]) tmp_total = atoi(val_one) - atoi(val_two);
-
-    return tmp_total;
-}
-
-struct evaluation_factors calculate_by_math_operator(struct evaluation_factors e)
-{
-    char *val_one = (char *)malloc (sizeof (char) * strlen(e.assignment));
-    char *val_two = (char *)malloc (sizeof (char) * strlen(e.assignment));
-    
-    char *math_op = (char *)malloc (sizeof (char) * strlen(e.assignment));
-    int math_op_count = 0;
-    
-    int i = 0;
-    int i_two = 0;
-
-    while(i < strlen(e.assignment)) {
-        for (int j = 0; j < strlen(MATH_OPS); j++) {
-            if (e.assignment[i] == MATH_OPS[j]) {
-                math_op[0] = e.assignment[i];
-                math_op_count += 1;
-                i += 1;
-            }
-        }
-
-        if (math_op_count == 0) val_one[i] = e.assignment[i];
-        if (math_op_count == 1) {
-            val_two[i_two] = e.assignment[i];
-            i_two += 1;
-        }
-        
-        if (math_op_count == 2) break;
-        i += 1;
-    }
-
-    if (strlen(val_one) == 0 || strlen(val_two) == 0 || strstr(val_one, " ") || strstr(val_two, " ")) {
-        printf("invalid expression\n");
-        e.valid = false;
-    }
-    else {
-        double total = calculate(val_one, val_two, math_op);
-        gcvt(total, 10, e.assignment);
-    }
-    // printf("%s\n", val_one);
-    // printf("%s\n", val_two);
-
-    return e;
-}
 
 struct evaluation_factors extract_assign(struct evaluation_factors e, char *line) 
 {
@@ -101,5 +43,39 @@ struct evaluation_factors extract_evaluate(struct evaluation_factors e)
 
     // Calculate total value from basic mathematical operators
     // printf("%s\n", e.assignment);
+    if (strstr(e.assignment, EQUAL)) return evaluate_relational_operator(e, EQUAL);
+    if (strstr(e.assignment, NOT_EQUAL)) return evaluate_relational_operator(e, NOT_EQUAL);
+    if (strstr(e.assignment, GREATER_THAN)) return evaluate_relational_operator(e, GREATER_THAN);
+    if (strstr(e.assignment, LESS_THAN)) return evaluate_relational_operator(e, LESS_THAN);
+    if (strstr(e.assignment, GREATER_EQUAL_THAN)) return evaluate_relational_operator(e, GREATER_EQUAL_THAN);
+    if (strstr(e.assignment, LESS_EQUAL_THAN)) return evaluate_relational_operator(e, LESS_EQUAL_THAN);
+
     return calculate_by_math_operator(e);
+}
+
+// Evaluate if the assignment is syntax-correct
+struct evaluation_factors verify_assignment_syntax(struct evaluation_factors e, char *line) {
+    /* Validate:
+        - Variable is followed by "="
+        - Only 1 "=" in the assignment
+    */
+    int index = 0;
+    int equal_sign_count = 0;
+    while (index < strlen(line)) {
+        if (line[index] == '=') equal_sign_count += 1;
+        index += 1;
+    }
+
+    if (equal_sign_count == 1) {
+        e = extract_assign(e, line);
+        e = classify(e);
+    }
+
+    // if (equal_sign_count == 2) {
+    //     e = extract_assign(e, line);
+    //     e = classify(e);
+    //     printf("%s\n", e.variable_name);
+    //     printf("%s\n", e.assignment);
+    // }
+    return e;
 }
