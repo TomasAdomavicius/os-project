@@ -71,11 +71,5 @@ struct evaluation_factors verify_assignment_syntax(struct evaluation_factors e, 
         e = classify(e);
     }
 
-    // if (equal_sign_count == 2) {
-    //     e = extract_assign(e, line);
-    //     e = classify(e);
-    //     printf("%s\n", e.variable_name);
-    //     printf("%s\n", e.assignment);
-    // }
     return e;
 }
