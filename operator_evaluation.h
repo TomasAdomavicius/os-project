@@ -63,7 +63,8 @@ struct evaluation_factors calculate_by_math_operator(struct evaluation_factors e
         i += 1;
     }
 
-    // printf("%i\n", math_op_count);
+    // printf("%s\n", e.assignment);
+    // printf("%s\n", val_two);
 
     // Handle cases such as ' *3', '3* ', '*3' and '3*'
     if (strlen(val_one) == 0 || strlen(val_two) == 0 || strstr(val_one, " ") || strstr(val_two, " ")) {
@@ -77,6 +78,8 @@ struct evaluation_factors calculate_by_math_operator(struct evaluation_factors e
             gcvt(total, 10, e.assignment);
         }
     }
+
+    // printf("%s\n", e.assignment);
 
     return e;
 }

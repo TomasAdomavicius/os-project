@@ -27,7 +27,8 @@ struct evaluation_factors classify(struct evaluation_factors e)
     e.valid = true;
     if (first_backtick && second_backtick) {
         e.evaluating_value = true;
-        if (!strstr(e.assignment, "expr ")) e.valid = false;
+        // if (!strstr(e.assignment, "expr ")) e.valid = false;
+        // printf("%s\n", strstr(e.assignment, "expr "));
     }
 
     return e;
@@ -38,11 +39,10 @@ struct evaluation_factors extract_evaluate(struct evaluation_factors e)
     // Extract value after the first space in 'expr'
     int index = strcspn(e.assignment, " ");
     char *tmp_val = (char *)malloc (sizeof (char) * strlen(e.assignment));
-    for (int i = index+1; i < strlen(e.assignment)-1; i++) strncat(tmp_val, &e.assignment[i], 1);
+    for (int i = index+1; i < strlen(e.assignment)-2; i++) strncat(tmp_val, &e.assignment[i], 1);
     e.assignment = tmp_val;
 
     // Calculate total value from basic mathematical operators
-    // printf("%s\n", e.assignment);
     if (strstr(e.assignment, EQUAL)) return evaluate_relational_operator(e, EQUAL);
     if (strstr(e.assignment, NOT_EQUAL)) return evaluate_relational_operator(e, NOT_EQUAL);
     if (strstr(e.assignment, GREATER_THAN)) return evaluate_relational_operator(e, GREATER_THAN);
@@ -54,7 +54,8 @@ struct evaluation_factors extract_evaluate(struct evaluation_factors e)
 }
 
 // Evaluate if the assignment is syntax-correct
-struct evaluation_factors verify_assignment_syntax(struct evaluation_factors e, char *line) {
+struct evaluation_factors verify_assignment_syntax(struct evaluation_factors e, char *line)
+{
     /* Validate:
         - Variable is followed by "="
         - Only 1 "=" in the assignment
@@ -70,6 +71,21 @@ struct evaluation_factors verify_assignment_syntax(struct evaluation_factors e, 
         e = extract_assign(e, line);
         e = classify(e);
     }
+
+    return e;
+}
+
+struct evaluation_factors verify_expr_syntax(struct evaluation_factors e, char **line)
+{
+    char *tmp_line = (char *)malloc (sizeof (char) * 100);
+    for (int i = 0; i < sizeof(line); i++) {
+        if (line[i] == NULL) break;
+        strcat(tmp_line, line[i]);
+        strcat(tmp_line, " ");
+    }
+
+    e = extract_assign(e, tmp_line);
+    e = classify(e);
 
     return e;
 }
