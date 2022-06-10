@@ -5,7 +5,10 @@
 #include <signal.h>
 #include <termios.h>
 #include <stdbool.h>
-#include "shell_substitution.h"
+#include "direct_assignment.h"
+#include "operator_evaluation.h"
+#include "expression_validation.h"
+
 
 #define NR_OF_JOBS 20
 #define BUFSIZE 1024
@@ -505,39 +508,26 @@ void display_assignment_result(struct evaluation_factors e, char *line) {
         return;
     }
 
-    char *variable_str = extract_substring_of_equal_sign_string(e.assignment, 'p');
-    char *value_str = extract_substring_of_equal_sign_string(e.assignment, 's');
-
     char *display_str = retrieve_string_inside_quotation_mark(line);
     if (is_dollar_present(display_str)) {
         // Extract prefix (anything before $)
         char *prefix = extract_substring_of_dollar_string(display_str, "", 'p');
         // Extract suffix (anything after the assignment of $)
-        char *suffix = extract_substring_of_dollar_string(display_str, variable_str, 's');
+        char *suffix = extract_substring_of_dollar_string(display_str, e.variable_name, 's');
 
-        printf("%s%s%s\n", prefix, value_str, suffix);
+        printf("%s%s%s\n", prefix, e.assignment, suffix);
     } else   // Display string as usual
         printf("%s\n", display_str);
 }
 
-// Evaluate if the assignment is syntax-correct
-struct evaluation_factors verify_assignment_syntax(struct evaluation_factors e, char *line) {
-    /* Validate:
-        - Variable is followed by "="
-        - Only 1 "=" in the assignment
-    */
-    int index = 0;
-    int equal_sign_count = 0;
-    while (index < strlen(line)) {
-        if (line[index] == '=') equal_sign_count += 1;
-        index += 1;
-    }
-
-    if (equal_sign_count == 1) {
-        e.assignment = line;
-        e.valid = true;
-    }
-    return e;
+struct evaluation_factors initialize_expression() 
+{
+    struct evaluation_factors eval;
+    eval.assignment = "";
+    eval.variable_name = "";
+    eval.evaluating_value = false;
+    eval.valid = false;
+    return eval;
 }
 
 void loop() {
@@ -545,9 +535,7 @@ void loop() {
     struct job *job;
 
     // Initialize values for assignment evaluation preventing error prompt
-    // struct evaluation_factors eval;
-    // eval.assignment = "";
-    // eval.valid = false;
+    struct evaluation_factors eval = initialize_expression();
 
     while (1) {
         printf("> ");
@@ -558,19 +546,21 @@ void loop() {
             continue;
         }
 
-        // // Validate the assignment input
-        // if (strlen(eval.assignment) == 0) {
-        //     eval = verify_assignment_syntax(eval, line);
-        //     continue;
-        // }
-        
-        // // Confirm that the assessment is valid
-        // if (eval.valid == true) {
-        //     display_assignment_result(eval, line);
-        //     // eval.assignment = "";
-        //     eval.valid = false;
-        //     continue;
-        // }
+        // Validate the assignment input
+        if (strlen(eval.assignment) == 0) {
+            eval = verify_assignment_syntax(eval, line);
+            // Expression does not contain 'expr' in ``
+            if (eval.valid == false) printf("%s: command not found\n", eval.assignment);
+            // Validate and evaluate value containing 'expr'
+            if (eval.valid == true && eval.evaluating_value == true) eval = extract_evaluate(eval);
+            continue;
+        }
+        // Assign value to output for displaying
+        if (eval.valid == true) {
+            display_assignment_result(eval, line);
+            eval.valid = false;
+            continue;
+        } else printf("result not printed due to invalid expression\n");
 
         job = createJob(line);
         launchJob(job);

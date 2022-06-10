@@ -2,4 +2,7 @@
 
 !.gitignore
 !shell.c
-!shell_substitution.h
+!direct_assignment.h
+!expression_validation.h
+!operator_evaluation.h
+
