@@ -31,7 +31,6 @@ bool is_print_command_valid(char *line)
 char *retrieve_string_inside_quotation_mark(char *line)
 {
     // Retrieve the string inside the quotation marks
-    // char *quotation_mark_str = strchr(line, '"');
     char *display_str = (char *)malloc (sizeof (char) * strlen(line));
     for (int i = (COMM_SIZE + 1); i < (strlen(line)-1); i++) {
         display_str[i-(COMM_SIZE + 1)] = line[i];

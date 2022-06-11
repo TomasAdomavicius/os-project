@@ -72,6 +72,15 @@ int shell_is_interactive;
 
 pid_t waitpid(pid_t pid, int *stat_loc, int options);
 
+struct evaluation_factors initialize_expression() 
+{
+    eval.assignment = "";
+    eval.variable_name = "";
+    eval.evaluating_value = false;
+    eval.valid = false;
+    return eval;
+}
+
 int insertJob(struct job *job) {
     int id = 1;
     while(shell->jobs[id] != NULL) {
@@ -176,8 +185,10 @@ int getCommandType(char *command) {
         return COMMAND_EXPRESSION_OPERATOR;
     } else if (!eval.valid && print_statement > 0) {
         return COMMAND_INVALID_EXPRESSION;
+    } else if (!eval.valid && print_statement == 0) {
+        return COMMAND_DISPLAY_RESULT;      // Case where the invalid evaluation cannot be printed
     } else if (eval.valid && print_statement == 0) {
-        return COMMAND_DISPLAY_RESULT;
+        return COMMAND_DISPLAY_RESULT;      // Case of normal printing
     } else {
         return COMMAND_EXTERNAL;
     }
@@ -337,12 +348,13 @@ int executeBuiltinCommand(struct process *proc) {
         case COMMAND_EXPRESSION_OPERATOR:
             eval = verify_expr_syntax(eval, proc->argv);
             eval = extract_evaluate(eval);
+            if (!eval.valid) eval = initialize_expression();
             break;
         case COMMAND_INVALID_EXPRESSION:
-            // printf("%s: command not found\n", eval.assignment);
-            printf("command not found\n");
+            printf("%s: command not found\n", eval.assignment);
             break;
         case COMMAND_DISPLAY_RESULT:
+            if (!eval.valid) break;
             display_assignment_result(eval, proc->command);
             break;
         default:
@@ -532,15 +544,6 @@ char* readLine() {
     }
 }
 
-struct evaluation_factors initialize_expression() 
-{
-    eval.assignment = "";
-    eval.variable_name = "";
-    eval.evaluating_value = false;
-    eval.valid = false;
-    return eval;
-}
-
 void loop() {
     char *line;
     struct job *job;
@@ -556,22 +559,6 @@ void loop() {
             checkZombie();
             continue;
         }
-
-        // // Validate the assignment input
-        // if (strlen(eval.assignment) == 0) {
-        //     eval = verify_assignment_syntax(eval, line);
-        //     // Expression not containing 'expr' in ``
-        //     if (eval.valid == false) printf("%s: command not found\n", eval.assignment);
-        //     // Validate and evaluate value containing 'expr'
-        //     if (eval.valid == true && eval.evaluating_value == true) eval = extract_evaluate(eval);
-        //     continue;
-        // }
-        // // Assign value to output for displaying
-        // if (eval.valid == true) {
-        //     display_assignment_result(eval, line);
-        //     eval.valid = false;
-        //     continue;
-        // } else printf("result not printed due to invalid expression\n");
 
         job = createJob(line);
         launchJob(job);

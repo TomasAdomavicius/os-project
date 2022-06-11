@@ -63,9 +63,6 @@ struct evaluation_factors calculate_by_math_operator(struct evaluation_factors e
         i += 1;
     }
 
-    // printf("%s\n", e.assignment);
-    // printf("%s\n", val_two);
-
     // Handle cases such as ' *3', '3* ', '*3' and '3*'
     if (strlen(val_one) == 0 || strlen(val_two) == 0 || strstr(val_one, " ") || strstr(val_two, " ")) {
         printf("invalid expression\n");
@@ -78,8 +75,6 @@ struct evaluation_factors calculate_by_math_operator(struct evaluation_factors e
             gcvt(total, 10, e.assignment);
         }
     }
-
-    // printf("%s\n", e.assignment);
 
     return e;
 }
@@ -117,9 +112,6 @@ struct evaluation_factors evaluate_relational_operator(struct evaluation_factors
         }        
         i += 1;
     }
-
-    // printf("%s\n", val_one);
-    // printf("%s\n", val_two);
 
     // Validate if a non-nummeric character is present
     if (!is_non_nummeric_char_present(val_one) && !is_non_nummeric_char_present(val_two)) {
