@@ -22,6 +22,10 @@
 #define COMMAND_BG 3
 #define COMMAND_KILL 4
 #define COMMAND_EXIT 5
+#define COMMAND_VALID_EXPRESSION 6
+#define COMMAND_INVALID_EXPRESSION 7
+#define COMMAND_EXPRESSION_OPERATOR 8
+#define COMMAND_DISPLAY_RESULT 9
 
 #define STATUS_RUNNING 0
 #define STATUS_DONE 1
@@ -59,6 +63,7 @@ struct shell_info {
 };
 
 struct shell_info *shell;
+struct evaluation_factors eval;
 
 pid_t shell_pgid;
 struct termios shell_tmodes;
@@ -66,6 +71,15 @@ int shell_terminal;
 int shell_is_interactive;
 
 pid_t waitpid(pid_t pid, int *stat_loc, int options);
+
+struct evaluation_factors initialize_expression() 
+{
+    eval.assignment = "";
+    eval.variable_name = "";
+    eval.evaluating_value = false;
+    eval.valid = false;
+    return eval;
+}
 
 int insertJob(struct job *job) {
     int id = 1;
@@ -149,19 +163,42 @@ int waitForJob(int id) {
 }
 
 int getCommandType(char *command) {
-    if (strcmp(command, "jobs") == 0) {
-        return COMMAND_JOBS;
-    } else if (strcmp(command, "fg") == 0) {
-        return COMMAND_FG;
-    } else if (strcmp(command, "bg") == 0) {
-        return COMMAND_BG;
-    } else if (strcmp(command, "kill") == 0) {
-        return COMMAND_KILL;
-    } else if (strcmp(command, "exit") == 0) {
-        return COMMAND_EXIT;
-    } else {
+    int print_statement = strcmp(command, "print");
+    
+    if (print_statement > 0) eval = verify_assignment_syntax(eval, command);
+    // printf("%i\n", print_statement);
+    // printf("%i\n", eval.valid);
+
+    if (strcmp(command, "jobs") == 0) return COMMAND_JOBS;
+    else if (strcmp(command, "fg") == 0) return COMMAND_FG;
+    else if (strcmp(command, "bg") == 0) return COMMAND_BG;
+    else if (strcmp(command, "kill") == 0) return COMMAND_KILL;
+    else if (strcmp(command, "exit") == 0) return COMMAND_EXIT;
+    else {
+        if (strcmp(command, "sleep") == 0) {
+            // eval = initialize_expression();
+            return COMMAND_EXTERNAL;
+        }
+        // printf("%s\n", eval.assignment);
+        if (eval.valid && print_statement > 0) {
+            if (!eval.evaluating_value) return COMMAND_VALID_EXPRESSION;
+            else return COMMAND_EXPRESSION_OPERATOR;
+        }
+        if (!eval.valid) {
+            if (print_statement > 0) return COMMAND_INVALID_EXPRESSION;
+            else if (print_statement == 0) return COMMAND_DISPLAY_RESULT;
+        }
+        if (eval.valid && print_statement == 0) return COMMAND_DISPLAY_RESULT;
         return COMMAND_EXTERNAL;
     }
+    // else if (eval.valid && print_statement > 0 && eval.evaluating_value == false) return COMMAND_VALID_EXPRESSION;
+    // else if (eval.valid && print_statement > 0 && eval.evaluating_value == true) return COMMAND_EXPRESSION_OPERATOR;
+    // else if (!eval.valid && print_statement > 0) return COMMAND_INVALID_EXPRESSION;
+    // else if (!eval.valid && print_statement == 0) {
+    //     return COMMAND_DISPLAY_RESULT;      // Case where the invalid evaluation cannot be printed
+    // } else if (eval.valid && print_statement == 0) {
+    //     return COMMAND_DISPLAY_RESULT;      // Case of normal printing
+    // } else return COMMAND_EXTERNAL;
 }
 
 int jobs(int argc, char **argv) {
@@ -312,6 +349,23 @@ int executeBuiltinCommand(struct process *proc) {
             break;
         case COMMAND_KILL:
             killJob(proc->argc, proc->argv);
+            break;
+        case COMMAND_VALID_EXPRESSION:
+            // printf("%i\n", proc->pid);
+            // printf("%i\n", proc->status);
+            // printf("%i\n", proc->type);
+            break;
+        case COMMAND_EXPRESSION_OPERATOR:
+            eval = verify_expr_syntax(eval, proc->argv);
+            eval = extract_evaluate(eval);
+            if (!eval.valid) eval = initialize_expression();
+            break;
+        case COMMAND_INVALID_EXPRESSION:
+            printf("%s: command not found\n", eval.assignment);
+            break;
+        case COMMAND_DISPLAY_RESULT:
+            if (!eval.valid) break;
+            display_assignment_result(eval, proc->command);
             break;
         default:
             return 0;
@@ -500,42 +554,12 @@ char* readLine() {
     }
 }
 
-// Display the result after processing and extraction
-void display_assignment_result(struct evaluation_factors e, char *line) {
-    bool res = is_print_command_valid(line);
-    if (!res) {
-        printf("%s\n", "Command is invalid!");
-        return;
-    }
-
-    char *display_str = retrieve_string_inside_quotation_mark(line);
-    if (is_dollar_present(display_str)) {
-        // Extract prefix (anything before $)
-        char *prefix = extract_substring_of_dollar_string(display_str, "", 'p');
-        // Extract suffix (anything after the assignment of $)
-        char *suffix = extract_substring_of_dollar_string(display_str, e.variable_name, 's');
-
-        printf("%s%s%s\n", prefix, e.assignment, suffix);
-    } else   // Display string as usual
-        printf("%s\n", display_str);
-}
-
-struct evaluation_factors initialize_expression() 
-{
-    struct evaluation_factors eval;
-    eval.assignment = "";
-    eval.variable_name = "";
-    eval.evaluating_value = false;
-    eval.valid = false;
-    return eval;
-}
-
 void loop() {
     char *line;
     struct job *job;
 
     // Initialize values for assignment evaluation preventing error prompt
-    struct evaluation_factors eval = initialize_expression();
+    eval = initialize_expression();
 
     while (1) {
         printf("> ");
@@ -545,22 +569,6 @@ void loop() {
             checkZombie();
             continue;
         }
-
-        // Validate the assignment input
-        if (strlen(eval.assignment) == 0) {
-            eval = verify_assignment_syntax(eval, line);
-            // Expression does not contain 'expr' in ``
-            if (eval.valid == false) printf("%s: command not found\n", eval.assignment);
-            // Validate and evaluate value containing 'expr'
-            if (eval.valid == true && eval.evaluating_value == true) eval = extract_evaluate(eval);
-            continue;
-        }
-        // Assign value to output for displaying
-        if (eval.valid == true) {
-            display_assignment_result(eval, line);
-            eval.valid = false;
-            continue;
-        } else printf("result not printed due to invalid expression\n");
 
         job = createJob(line);
         launchJob(job);
