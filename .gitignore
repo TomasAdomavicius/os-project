@@ -2,3 +2,7 @@
 
 !.gitignore
 !shell.c
+!direct_assignment.h
+!expression_validation.h
+!operator_evaluation.h
+
