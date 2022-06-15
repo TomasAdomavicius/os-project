@@ -175,11 +175,7 @@ int getCommandType(char *command) {
     else if (strcmp(command, "kill") == 0) return COMMAND_KILL;
     else if (strcmp(command, "exit") == 0) return COMMAND_EXIT;
     else {
-        if (strcmp(command, "sleep") == 0) {
-            // eval = initialize_expression();
-            return COMMAND_EXTERNAL;
-        }
-        // printf("%s\n", eval.assignment);
+        if (strcmp(command, "sleep") == 0) return COMMAND_EXTERNAL;
         if (eval.valid && print_statement > 0) {
             if (!eval.evaluating_value) return COMMAND_VALID_EXPRESSION;
             else return COMMAND_EXPRESSION_OPERATOR;
@@ -191,14 +187,6 @@ int getCommandType(char *command) {
         if (eval.valid && print_statement == 0) return COMMAND_DISPLAY_RESULT;
         return COMMAND_EXTERNAL;
     }
-    // else if (eval.valid && print_statement > 0 && eval.evaluating_value == false) return COMMAND_VALID_EXPRESSION;
-    // else if (eval.valid && print_statement > 0 && eval.evaluating_value == true) return COMMAND_EXPRESSION_OPERATOR;
-    // else if (!eval.valid && print_statement > 0) return COMMAND_INVALID_EXPRESSION;
-    // else if (!eval.valid && print_statement == 0) {
-    //     return COMMAND_DISPLAY_RESULT;      // Case where the invalid evaluation cannot be printed
-    // } else if (eval.valid && print_statement == 0) {
-    //     return COMMAND_DISPLAY_RESULT;      // Case of normal printing
-    // } else return COMMAND_EXTERNAL;
 }
 
 int jobs(int argc, char **argv) {
@@ -351,9 +339,6 @@ int executeBuiltinCommand(struct process *proc) {
             killJob(proc->argc, proc->argv);
             break;
         case COMMAND_VALID_EXPRESSION:
-            // printf("%i\n", proc->pid);
-            // printf("%i\n", proc->status);
-            // printf("%i\n", proc->type);
             break;
         case COMMAND_EXPRESSION_OPERATOR:
             eval = verify_expr_syntax(eval, proc->argv);
