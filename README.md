@@ -2,7 +2,7 @@
 ### Custom shell implementation in C
 Team memebers:
 * Tomas Adomavicius (Job control)
-* Aziz Tas (I/O redirection, piping)
+
 * Thuan Anh Bui (Shell substitution, basic operators)
 ### Instructions on how to compile and run the code
 - Locate the directory of the project, execute the command `gcc -o [compile_file_name] shell.c`
